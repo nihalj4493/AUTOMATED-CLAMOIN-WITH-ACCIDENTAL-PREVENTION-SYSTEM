@@ -1,0 +1,100 @@
+// Pin assignments
+const int valveA = 8;
+const int valveB = 9;
+const int irSensors[] = {5, 6, 7}; // Array of IR sensor pins
+const int numSensors = sizeof(irSensors) / sizeof(irSensors[0]); // Number of sensors
+const int buttonPin = 2;   // Button on pin 2
+
+// Variables to track states and timing
+int currentValve = 0;  // 0 for Valve A, 1 for Valve B
+bool isRunning = false; // Track if the system is running
+bool lastButtonState = HIGH;  // Store the last button state
+unsigned long previousMillis = 0; // Store the last time a valve was switched
+const unsigned long valveInterval = 5000; // Time interval for valve switching (5 seconds)
+
+void setup() {
+  // Set pin modes
+  pinMode(valveA, OUTPUT);
+  pinMode(valveB, OUTPUT);
+  
+  // Initialize IR sensors as INPUT
+  for (int i = 0; i < numSensors; i++) {
+    pinMode(irSensors[i], INPUT);
+  }
+
+  pinMode(buttonPin, INPUT_PULLUP); // Button pin with internal pull-up resistor
+
+  // Initialize valves to OFF (HIGH)
+  digitalWrite(valveA, HIGH);
+  digitalWrite(valveB, HIGH);
+}
+
+void loop() {
+  // Read button state
+  bool currentButtonState = digitalRead(buttonPin);
+
+  // Check all IR sensors for obstacles
+  bool obstacleDetected = false;
+  for (int i = 0; i < numSensors; i++) {
+    if (digitalRead(irSensors[i]) == LOW) {
+      obstacleDetected = true;
+      break;
+    }
+  }
+
+  // Detect button press (HIGH to LOW transition)
+  if (currentButtonState == LOW && lastButtonState == HIGH) {
+    // Toggle the system state: Start or Stop
+    isRunning = !isRunning;
+
+    if (!isRunning) {
+      stopValves(); // If system stops, turn off both valves
+    } else {
+      previousMillis = millis(); // Reset the timer when system starts
+      switchValve(); // Start with the first valve immediately
+    }
+  }
+
+  // If system is running, handle IR sensor and valve switching
+  if (isRunning) {
+    if (obstacleDetected) {
+      // If obstacle is detected, stop both valves
+      stopValves();
+      isRunning = false; // Stop the system
+    } else {
+      // Handle valve switching based on time
+      unsigned long currentMillis = millis();
+      if (currentMillis - previousMillis >= valveInterval) {
+        previousMillis = currentMillis; // Reset the timer
+        switchValve(); // Switch to the next valve
+      }
+    }
+  }
+
+  // Save the current button state for the next loop
+  lastButtonState = currentButtonState;
+
+  // Small delay to avoid bouncing issues
+  delay(50);
+}
+
+// Function to switch between valves
+void switchValve() {
+  if (currentValve == 0) {
+    // Turn on Valve B, turn off Valve A
+    digitalWrite(valveA, LOW);
+    digitalWrite(valveB, HIGH);
+    currentValve = 1;
+  } else {
+    // Turn on Valve A, turn off Valve B
+    digitalWrite(valveB, LOW);
+    digitalWrite(valveA, HIGH);
+    currentValve = 0;
+  }
+}
+
+// Function to stop both valves
+void stopValves() {
+  digitalWrite(valveA, HIGH);
+  digitalWrite(valveB, HIGH);
+}
